@@ -1,0 +1,9 @@
+ScopeId,IPAddress,Name,ClientId,Description
+192.168.100.0,192.168.101.113,Komputer13,1a-1b-1c-1d-1e-1f,Rezerwacja dla komputera13
+192.168.100.0,192.168.101.114,Komputer14,1a-1b-1c-1d-1e-2f,Rezerwacja dla komputera14
+192.168.100.0,192.168.101.115,Komputer15,1a-1b-1c-1d-1e-3f,Rezerwacja dla komputera15
+192.168.100.0,192.168.101.116,Komputer16,1a-1b-1c-1d-1e-4f,Rezerwacja dla komputera16
+192.168.100.0,192.168.101.117,Komputer17,1a-1b-1c-1d-1e-5f,Rezerwacja dla komputera17
+192.168.100.0,192.168.101.118,Komputer18,1a-1b-1c-1d-1e-6f,Rezerwacja dla komputera18
+192.168.100.0,192.168.101.119,Komputer19,1a-1b-1c-1d-1e-7f,Rezerwacja dla komputera19
+192.168.100.0,192.168.101.120,Komputer20,1a-1b-1c-1d-1e-8f,Rezerwacja dla komputera20
