@@ -5,7 +5,7 @@
 **VL-DC1.virtuallab.com** - kontroler domeny, na nim będą wykonywane wszystkie komendy\
 **VL-STOR1.virtuallab.com** - serwer udostępniający objekt docelowy iSCSI\
 **VL-CL1.virtuallab.com** - pierwszy nod klastra\
-**VL-VL2.virtuallab.com** - drugi nod klastra
+**VL-CL2.virtuallab.com** - drugi nod klastra
 
 ## Krok 0. Przygotowanie obiektu docelowego iSCSI
 Nawiązanie sesji zdalnej z VL-STOR1:
@@ -377,12 +377,13 @@ SameSubnetDelay           : 1000
 SameSubnetThreshold       : 30
 ```
 
-Konfigurowanie kworum klastra:\
-Do skonfigurowania kworum w klastrze można użyć:
+Konfigurowanie monitora kworum klastra:\
+Do skonfigurowania monitora kworum w klastrze można użyć:
 * udziału plików
 * dysku
-* obiektów blob w usłudze Azure
-użyjemy udzuału plików udostępnionego na serwerze VL-STOR1:
+* obiektów blob w usłudze Azure,\
+użyjemy udziału plików udostępnionego na serwerze VL-STOR1\
+tworzymy udział na VL-STOR1:
 ```powershell
 PS C:\Users\administrator.VIRTUALLAB> Invoke-Command -ComputerName VL-STOR1 -ScriptBlock {New-Item -Path c:\Quorum -ItemType Directory}
 
