@@ -11,7 +11,7 @@ New-ADGroup -Name "SQLFarm" -SamAccountName "SQLFarm" -GroupCategory Security -G
 Get-ADGroup -Identity "SQLFarm"
 
 # Dodanie serwerów do grupy
-Get-ADComputer -Filter 'Name -like "sea-svr*"' | Add-ADPrincipalGroupMembership -MemberOf SQLFarm
+Get-ADComputer -Filter 'Name -like "svr-sql*"' | Add-ADPrincipalGroupMembership -MemberOf SQLFarm
 
 #Sprawdzenie
 Get-ADGroupMember -Identity SQLFarm | Select-Object -Property Name

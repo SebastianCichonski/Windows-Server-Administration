@@ -1,42 +1,67 @@
-# Storage Space
-**Storage space** to technologia umożliwiająca grupowanie dysków w pule magazynów a następnie tworzenie z tych pul dysków wirtualnych, technologia zapewnia także dwa typy odporności: **Mirror** i **Parity**.
+## Storage Spaces — opis i instrukcja
 
-Poziomy odporności i wymagania dot. dysków:
-- Do utworzenia puli magazynów wymagany jest jeden dysk fizyczny.
-- Do utworzenia odpornego dublowanego dysku wirtualnego wymagane są co najmniej dwa dyski fizyczne.
-- Do utworzenia dysku wirtualnego z odpornością dzięki parzystości wymagane są co najmniej trzy dyski fizyczne.
-- Trójstronne dublowanie wymaga co najmniej pięciu dysków fizycznych.
-- Dyski muszą być puste i niesformatowane. Na dyskach nie może istnieć żaden wolumin.
-- Dyski można dołączać przy użyciu różnych interfejsów magistrali, w tym interfejsu SCSI (Small Computer System Interface), Serial Attached SCSI (SAS), Serial ATA (SATA), NVM Express (NVMe).
+Ten dokument został przygotowany na podstawie skryptu `StorageSpace.ps1`. Zawiera cel, wymagania, kroki konfiguracji (polecenia PowerShell z przykładowymi wyjściami), typowe problemy i wskazówki oraz bezpieczeństwo i dobre praktyki.
 
-Sprawdzamy dostępne dyski, które możemy dodać do puli magazynu:
+## Cel
+Utworzenie puli magazynów (Storage Pool) z dostępnych dysków fizycznych, a następnie utworzenie wirtualnego dysku o odporności Mirror i sformatowanie go systemem plików ReFS. Rozwiązanie pozwala na logiczne grupowanie fizycznych urządzeń magazynowych i tworzenie odpornych woluminów.
+
+## Wymagania
+- Windows Server z rolą Storage (obsługa Storage Spaces).
+- co najmniej jeden dysk fizyczny dostępny do dodania do puli (pusta powierzchnia, bez woluminów).
+- Do mirror (dublowania) wymagane co najmniej 2 dyski fizyczne.
+- Do parity (parzystości) wymagane co najmniej 3 dyski fizyczne.
+- Trójstronne mirror/3-way mirror wymaga co najmniej 5 dysków.
+- Dyski najlepiej mieć w stanie `CanPool = True` (niesformatowane, bez woluminów).
+- Zalecane: nowe dyski dedykowane do puli lub dyski o tej samej pojemności i typie (HDD/SSD/NVMe) dla lepszej wydajności.
+
+## Kroki konfiguracji (przykładowe polecenia)
+Poniższe polecenia pochodzą ze skryptu `StorageSpace.ps1`. Uruchom je w sesji PowerShell uruchomionej jako administrator.
+
+1) Sprawdź dyski możliwe do dodania do puli:
+
 ```powershell
 Get-PhysicalDisk -CanPool $true
+```
 
+Przykładowe wyjście:
+
+```text
 Number FriendlyName      SerialNumber MediaType   CanPool OperationalStatus HealthStatus Usage        Size
 ------ ------------      ------------ ---------   ------- ----------------- ------------ -----        ----
 1      Msft Virtual Disk              Unspecified True    OK                Healthy      Auto-Select 40 GB
 2      Msft Virtual Disk              Unspecified True    OK                Healthy      Auto-Select 40 GB
 ```
-**CanPoll** to pula pierwotna w której znajdują się dyski dostępne do dodania do puli magazynów (niewykorzystane).
 
-Sprawdzamy dostępne pule magazynów na komputerze:
+2) Zobacz pulę pierwotną (Primordial), w której znajdują się dyski gotowe do zassania:
+
 ```powershell
-Get-StoragePool 
+Get-StoragePool -IsPrimordial $true
+```
 
+Przykładowe wyjście:
+
+```text
 FriendlyName OperationalStatus HealthStatus IsPrimordial IsReadOnly   Size AllocatedSize
 ------------ ----------------- ------------ ------------ ----------   ---- -------------
 Primordial   OK                Healthy      True         False      120 GB           0 B
 ```
-Tworzymy nową pulę magazynu ze wszystkich dostępnych dysków w puli pierwotnej:
-```powershell
-New-StoragePool –FriendlyName SP1 –StorageSubsystemFriendlyName "Windows Storage*" –PhysicalDisks (Get-PhysicalDisk –CanPool $True)
 
+3) Utwórz nową pulę magazynów z dysków dostępnych w puli pierwotnej:
+
+```powershell
+New-StoragePool -FriendlyName SP1 -StorageSubsystemFriendlyName "Windows Storage*" -PhysicalDisks (Get-PhysicalDisk -CanPool $True)
+```
+
+Przykładowe potwierdzenie:
+
+```text
 FriendlyName OperationalStatus HealthStatus IsPrimordial IsReadOnly     Size AllocatedSize
 ------------ ----------------- ------------ ------------ ----------     ---- -------------
 SP1          OK                Healthy      False        False      78.97 GB        512 MB
 ```
-Sprawdzamy dostępne pule magazynów
+
+4) Sprawdź listę pul magazynów:
+
 ```powershell
  Get-StoragePool
 
@@ -45,16 +70,20 @@ FriendlyName OperationalStatus HealthStatus IsPrimordial IsReadOnly     Size All
 Primordial   OK                Healthy      True         False        120 GB      79.97 GB
 SP1          OK                Healthy      False        False      78.97 GB        512 MB
 ```
-Tworzymy dublowany wirtualny dysk w puli SP1 z maksymalnej dostępnej pojemności. Opis typów odporności dostępny tu: [klik](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/hh831739(v=ws.11))
+
+5) Utwórz wirtualny dysk o odporności Mirror (dublowany) i wykorzystaj maksymalną dostępną pojemność:
 
 ```powershell
-New-VirtualDisk –StoragePoolFriendlyName SP1 –FriendlyName VD1 –ResiliencySettingName Mirror –UseMaximumSize -ProvisioningType Fixed
+New-VirtualDisk -StoragePoolFriendlyName SP1 -FriendlyName VD1 -ResiliencySettingName Mirror -UseMaximumSize -ProvisioningType Fixed
 ```
-Pobieramy dysk fizyczny z dysku wirtualnego inicjujemy go domyślnym stylem partycji GPT, tworzymy nową partycję używając maksymalnej dostępnej ilości miejsca, formatujemy wolumin systemem plików ReFS i nadajemy etykirtę "Mirror"
+
+6) Zainicjuj dysk wirtualny, utwórz partycję, przypisz literę i sformatuj wolumin jako ReFS (etykieta: Mirror):
+
 ```powershell
 Get-VirtualDisk -FriendlyName VD1 | Get-Disk | Initialize-Disk -PassThru | New-Partition -UseMaximumSize -AssignDriveLetter | Format-Volume -FileSystem ReFS -NewFileSystemLabel "Mirror"
 ```
-Sprawdzamy czy dysk jest dostępny:
+
+Przykładowe sprawdzenie woluminów:
 
 ```powershell
 Get-Volume
@@ -65,3 +94,28 @@ E           Mirror                ReFS           Fixed     Healthy      OK      
 C           SDT_x64FREE_EN-US_VHD NTFS           Fixed     Healthy      OK                     28.17 GB    40 GB
 D                                 Unknown        CD-ROM    Healthy      Unknown                     0 B      0 B
 ```
+
+## Najczęstsze problemy i wskazówki
+- Dyski nie są dostępne do poolowania (`CanPool = False`):
+  - Upewnij się, że dysk jest pusty (nie ma na nim partycji/woluminów). Usuń istniejące woluminy przed dodaniem do puli.
+  - Niektóre dyski USB lub zewnętrzne obudowy mogą nie obsługiwać poolowania.
+
+- Błędy przy tworzeniu StoragePool:
+  - Sprawdź, czy przekazujesz właściwe dyski (`Get-PhysicalDisk -CanPool $True`).
+  - Upewnij się, że Storage Spaces service jest uruchomiona i że masz uprawnienia administratora.
+
+- Nierównomierna wydajność lub niższa pojemność niż oczekiwana:
+  - Zwróć uwagę na różnice w pojemności dysków; Storage Spaces wykorzystuje sumę dostępnych pojemności i może rezerwować przestrzeń.
+  - Dla najlepszej wydajności stosuj dyski o podobnych parametrach (typ, prędkość, pojemność).
+
+- Wybranie niewłaściwego ProvisioningType:
+  - `Fixed` rezerwuje miejsce od razu; `Thin` (ThinProvisioning) pozwala na alokację na żądanie, ale wymaga monitorowania wykorzystania.
+
+## Bezpieczeństwo i dobre praktyki
+- Testuj proces na środowisku testowym przed wdrożeniem produkcyjnym.
+- Zawsze wykonaj backup ważnych danych przed manipulacją dyskami/pulami.
+- Monitoruj stan pul i dysków (`Get-StoragePool`, `Get-PhysicalDisk`, `Get-VirtualDisk`, `Get-Volume`).
+- Ustal proces alarmowania (np. skrypt monitorujący status dysków i wysyłający e-mail/SMS przy awarii).
+- Rozważ użycie ReFS dla lepszej odporności i integralności danych, szczególnie na dużych woluminach.
+- Przy planowaniu odporności dobierz właściwy typ (Mirror vs Parity) do scenariusza: Mirror zapewnia lepszą wydajność i szybszą odbudowę; Parity lepszą oszczędność miejsca przy archiwach.
+---
